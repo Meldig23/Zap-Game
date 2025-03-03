@@ -43,104 +43,46 @@
      
    $reset = *ui_in[0];
    
+   $count_speed4[18:0] = (>>1$reset || >>1$count_speed4 == 19'd500000) ? 19'b0 : >>1$count_speed4 + 1;
+   $count_speed3[19:0] = (>>1$reset || >>1$count_speed3 == 20'd900000) ? 20'b0 : >>1$count_speed3 + 1;
+   $count_speed2[20:0] = (>>1$reset || >>1$count_speed2 == 21'd1700000) ? 21'b0 : >>1$count_speed2 + 1;
+   $count_speed1[23:0] = (>>1$reset || >>1$count_speed1 == 24'd2000000) ? 24'b0 : >>1$count_speed1 + 1;
    
-   $count_speed4[18:0] = (>>1$reset || >>1$count_speed4 == 19'd500000 ) ? 19'b0 : >>1$count_speed4 +1 ;
-   $clk_pulse4 = >>1$reset ? 1'b0: $count_speed4 == 19'd500000 ? ~>>1$clk_pulse4 : >>1$clk_pulse4 ;
+   $clk_pulse4 = >>1$reset ? 1'b0 : (>>1$count_speed4 == 19'd500000) ? ~>>1$clk_pulse4 : >>1$clk_pulse4;
+   $clk_pulse3 = >>1$reset ? 1'b0 : (>>1$count_speed3 == 20'd900000) ? ~>>1$clk_pulse3 : >>1$clk_pulse3;
+   $clk_pulse2 = >>1$reset ? 1'b0 : (>>1$count_speed2 == 21'd1700000) ? ~>>1$clk_pulse2 : >>1$clk_pulse2;
+   $clk_pulse1 = >>1$reset ? 1'b0 : (>>1$count_speed1 == 24'd2000000) ? ~>>1$clk_pulse1 : >>1$clk_pulse1;
    
-   $count_speed3[19:0] = (>>1$reset || >>1$count_speed3 == 20'd900000 ) ? 20'b0 : >>1$count_speed3 +1 ;
-   $clk_pulse3 = >>1$reset ? 1'b0: $count_speed3 == 20'd900000 ? ~>>1$clk_pulse3 : >>1$clk_pulse3 ;
+   $speed_level[1:0] = >>1$reset || (>>2$state == 2'b01 && >>3$state == 2'b10) ? 2'b0 :
+      ($right_edge && ($led_output == 8'h01 || $led_output == 8'h02 || $led_output == 8'h04 || $led_output == 8'h08)) ||
+      ($left_edge && ($led_output == 8'h80 || $led_output == 8'h40 || $led_output == 8'h20 || $led_output == 8'h10))
+      ? (3 - ($led_output[3:0] >> 1)) : >>1$speed_level;
    
-   $count_speed2[20:0] = (>>1$reset || >>1$count_speed2 == 21'd1700000 ) ? 21'b0 : >>1$count_speed2 +1 ;
-   $clk_pulse2 = >>1$reset ? 1'b0: $count_speed2 == 21'd1700000 ? ~>>1$clk_pulse2 : >>1$clk_pulse2 ;
+   $clk_pulse = ($speed_level == 2'b11) ? $clk_pulse4 : ($speed_level == 2'b10) ? $clk_pulse3 : ($speed_level == 2'b01) ? $clk_pulse2 : $clk_pulse1;
    
-   $count_speed1[23:0] = (>>1$reset || >>1$count_speed1 == 24'd2000000 ) ? 24'b0 : >>1$count_speed1 +1 ;
-   $clk_pulse1 = >>1$reset ? 1'b0: $count_speed1 == 24'd2000000 ? ~>>1$clk_pulse1 : >>1$clk_pulse1 ;
+   $led_output[7:0] = (>>1$win == 2'b01) ? (>>1$clk_pulse1 ? 8'b00001111 : 8'b0) :
+                      (>>1$win == 2'b10) ? (>>1$clk_pulse1 ? 8'b11110000 : 8'b0) :
+                      (>>1$reset || (>>2$state == 2'b01 && >>3$state == 2'b10)) ? 8'b00001000 :
+                      (>>2$state == 2'b10) ? >>3$score[7:0] :
+                      (!>>2$clk_pulse && >>1$clk_pulse) ? (>>1$forward ? >>1$led_output << 1 : >>1$led_output >> 1) : >>1$led_output;
    
+   $forward = >>1$reset || (>>2$state == 2'b01 && >>3$state == 2'b10) ? 1'b1 : ($right_edge && $led_output <= 8'd8) ? 1'b1 : ($left_edge && $led_output > 8'd8) ? 1'b0 : >>1$forward;
    
-             
-   $speed_level[1:0] = >>1$reset || (>>2$state == 2'b01 && >>3$state == 2'b10) ? 2'b0 :  
-               ($right_edge && $led_output == 8'h01) || ($left_edge  && $led_output == 8'h80)
-                  ? 2'd3
-               :  ($right_edge && $led_output == 8'h02) || ($left_edge  && $led_output == 8'h40)
-                  ? 2'd2
-               :  ($right_edge && $led_output == 8'h04) || ($left_edge  && $led_output == 8'h20)
-                  ? 2'd1
-               :  ($right_edge && $led_output == 8'h08) || ($left_edge  && $led_output == 8'h10)
-                  ? 2'd0
-                  //default
-                  : >>1$speed_level;
+   $state[1:0] = >>1$reset || $win ? 2'b01 : (>>1$led_output == 8'b0 && >>1$state == 2'b01) ? 2'b10 : (>>1$state == 2'b10 && >>1$wait_counter == 25'd30000000) ? 2'b01 : >>1$state;
    
+   $wait_counter[24:0] = >>1$reset || >>1$state == 2'b01 ? 25'b0 : (>>1$state == 2'b10 && >>1$wait_counter < 25'd30000000) ? >>1$wait_counter + 1 : 25'd0;
    
-   $clk_pulse = ($speed_level == 2'b11) ? $clk_pulse4 :
-                ($speed_level == 2'b10) ? $clk_pulse3 :
-                ($speed_level == 2'b01) ? $clk_pulse2 :
-                $clk_pulse1; // Default to slowest speed
+   $score[7:0] = >>1$reset ? 8'd0 : ((>>2$led_output == 8'h80 && >>1$led_output == 8'b0) ? (>>1$score ? >>1$score << 1 : 8'b00010000) :
+                                    (>>2$led_output == 8'h01 && >>1$led_output == 8'b0) ? (>>1$score ? >>1$score >> 1 : 8'b00001000) : >>1$score);
    
+   $win[1:0] = >>1$reset ? 2'd0 : ((>>2$led_output == 8'h80 && >>1$led_output == 8'b0 && >>1$score == 8'h80) ? 2'b01 :
+                                    (>>2$led_output == 8'h01 && >>1$led_output == 8'b0 && >>1$score == 8'h01) ? 2'b10 : >>1$win);
    
-   $led_output[7:0] = (>>1$win == 2'b01 )
-                        ? (>>1$clk_pulse1) 
-                           ?8'b00001111
-                           :8'b0
-                      :>>1$win == 2'b10
-                        ? (>>1$clk_pulse1) 
-                           ?8'b11110000
-                           : 8'b0
-   
-                     :(>>1$reset || (>>2$state == 2'b01 && >>3$state == 2'b10)  )
-                            ? 8'b00001000 :
-                   
-                      >>2$state == 2'b10 ? 
-                            >>3$score[7:0]
-                      :(!>>2$clk_pulse && >>1$clk_pulse) ?
-                          >>1$forward ? >>1$led_output[7:0] << 1 : >>1$led_output[7:0] >> 1 :
-                          >>1$led_output ;
-   
-   
-   $forward = >>1$reset || (>>2$state == 2'b01 && >>3$state == 2'b10) ? 1'b1 :  // forward is right to left when == 1'b1
-               ($right_edge  && $led_output <= 8'd8)
-                  ? 1'b1
-               :  ($left_edge  && $led_output > 8'd8)
-                  ? 1'b0
-                  //default
-                  : >>1$forward;
-   
-   
-   $state[1:0] = >>1$reset || $win != 2'b0 ? 2'b01 
-                 : (>>1$led_output == 8'b0 && >>1$state == 2'b01 ) ? //Score display
-                       2'b10
-                 : (>>1$state == 2'b10 && >>1$wait_counter == 25'd30000000)  ? // Normal gameplay
-                       2'b01
-                       
-                       : >>1$state[1:0] ;
-   
-   $wait_counter[24:0] = >>1$reset || >>1$state == 2'b01 ? 25'b0 :
-                      (>>1$state == 2'b10 && >>1$wait_counter < 25'd30000000) ? >>1$wait_counter + 1 :
-                      25'd0;
-
-                       
-   $score[7:0] = >>1$reset ? 8'd0 : 
-             (>>2$led_output == 8'h80  && >>1$led_output == 8'b0) 
-                ? >>1$score == 0 
-                   ? 8'b00010000 // Start score setting
-                   : >>1$score << 1 // Increase score
-             : (>>2$led_output == 8'h01  && >>1$led_output == 8'b0)
-                ? >>1$score == 0 
-                   ? 8'b00001000 // Start score setting
-                   : >>1$score >> 1 // Increase score
-                   
-                   : >>1$score ;
-   
-   $win[1:0] = >>1$reset ? 2'd0 : 
-               (>>2$led_output == 8'h80  && >>1$led_output == 8'b0 && >>1$score == 8'h80)
-                  ? 2'b01
-               : (>>2$led_output == 8'h01  && >>1$led_output == 8'b0 && >>1$score == 8'h01)
-                  ? 2'b10
-                  : >>1$win ;
-                  
    $left_btn = *ui_in[3];
-   $left_edge = (!>>1$left_btn && $left_btn) ;
    $right_btn = *ui_in[1];
-   $right_edge = (!>>1$right_btn && $right_btn) ;
+   $left_edge = !>>1$left_btn && $left_btn;
+   $right_edge = !>>1$right_btn && $right_btn;
+
    
    
    
