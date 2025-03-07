@@ -932,282 +932,123 @@ endmodule
       m5+imem(@1)
       
    |controller
-      @1
-         $reset = !/top/fpga_pins/fpga|fsm>>0$wm_select || *reset ;
-         $clk = *clk;
-         $start = *ui_in[1];
-         $low = *ui_in[2];
-         $med = *ui_in[3];
-         $hig = *ui_in[4];
-         
-         \SV_plus
-            Controller C1(.clk($clk),
-                        .reset($reset),
-                        .start($start),
-                        .low($low),
-                        .hig($hig),
-                        .med($med),
-                        .heating_op($$heat),
-                        .spinning_op($$spin),
-                        .pouring_op($$pour),
-                        .waiting_op($$wait),
-                        .prog_op($$prog),
-                        .level_op($$level),
-                        .temp_op($$temp),
-                        .dura_op($$dura));
-         $out[7:0] = {$heat,$spin,$pour,$wait,$prog,$level,$temp,$dura};
+      ?$wm_select
+         @1
+            $reset = !/top/fpga_pins/fpga|fsm>>0$wm_select || *reset ;
+            $clk = *clk;
+            $start = *ui_in[1];
+            $low = *ui_in[2];
+            $med = *ui_in[3];
+            $hig = *ui_in[4];
+
+            \SV_plus
+               Controller C1(.clk($clk),
+                           .reset($reset),
+                           .start($start),
+                           .low($low),
+                           .hig($hig),
+                           .med($med),
+                           .heating_op($$heat),
+                           .spinning_op($$spin),
+                           .pouring_op($$pour),
+                           .waiting_op($$wait),
+                           .prog_op($$prog),
+                           .level_op($$level),
+                           .temp_op($$temp),
+                           .dura_op($$dura));
+            $out[7:0] = {$heat,$spin,$pour,$wait,$prog,$level,$temp,$dura};
    
    |game
-      @1
-         $reset = *ui_in[0] ;
-         $count_speed4[18:0] = (>>1$reset || >>1$count_speed4 == 19'd500000 ) ? 19'b0 : >>1$count_speed4 +1 ;
-         $clk_pulse4 = >>1$reset ? 1'b0: $count_speed4 == 19'd500000 ? ~>>1$clk_pulse4 : >>1$clk_pulse4 ;
-         $count_speed3[19:0] = (>>1$reset || >>1$count_speed3 == 20'd900000 ) ? 20'b0 : >>1$count_speed3 +1 ;
-         $clk_pulse3 = >>1$reset ? 1'b0: $count_speed3 == 20'd900000 ? ~>>1$clk_pulse3 : >>1$clk_pulse3 ;
-         $count_speed2[20:0] = (>>1$reset || >>1$count_speed2 == 21'd1700000 ) ? 21'b0 : >>1$count_speed2 +1 ;
-         $clk_pulse2 = >>1$reset ? 1'b0: $count_speed2 == 21'd1700000 ? ~>>1$clk_pulse2 : >>1$clk_pulse2 ;
-         $count_speed1[23:0] = (>>1$reset || >>1$count_speed1 == 24'd2000000 ) ? 24'b0 : >>1$count_speed1 +1 ;
-         $clk_pulse1 = >>1$reset ? 1'b0: $count_speed1 == 24'd2000000 ? ~>>1$clk_pulse1 : >>1$clk_pulse1 ;
-             
-         $speed_level[1:0] = >>1$reset || (>>2$state == 2'b01 && >>3$state == 2'b10) ? 2'b0 :  
-               ($right_edge && $led_output == 8'h01) || ($left_edge  && $led_output == 8'h80)
-                  ? 2'd3
-               :  ($right_edge && $led_output == 8'h02) || ($left_edge  && $led_output == 8'h40)
-                  ? 2'd2
-               :  ($right_edge && $led_output == 8'h04) || ($left_edge  && $led_output == 8'h20)
-                  ? 2'd1
-               :  ($right_edge && $led_output == 8'h08) || ($left_edge  && $led_output == 8'h10)
-                  ? 2'd0
-                  //default
-                  : >>1$speed_level;
-         $clk_pulse = ($speed_level == 2'b11) ? $clk_pulse4 :
-                ($speed_level == 2'b10) ? $clk_pulse3 :
-                ($speed_level == 2'b01) ? $clk_pulse2 :
-                $clk_pulse1; // Default to slowest speed
-         $led_output[7:0] = (>>1$win == 2'b01 )
-                        ? (>>1$clk_pulse1) 
-                           ?8'b00001111
-                           :8'b0
-                      :>>1$win == 2'b10
-                        ? (>>1$clk_pulse1) 
-                           ?8'b11110000
-                           : 8'b0
-                     :(>>1$reset || (>>2$state == 2'b01 && >>3$state == 2'b10)  )
-                            ? 8'b00001000 :
-                   
-                      >>2$state == 2'b10 ? 
-                            >>3$score[7:0]
-                      :(!>>2$clk_pulse && >>1$clk_pulse) ?
-                          >>1$forward ? >>1$led_output[7:0] << 1 : >>1$led_output[7:0] >> 1 :
-                          >>1$led_output ;
-         $forward = >>1$reset || (>>2$state == 2'b01 && >>3$state == 2'b10) ? 1'b1 :  // forward is right to left when == 1'b1
-               ($right_edge  && $led_output <= 8'd8)
-                  ? 1'b1
-               :  ($left_edge  && $led_output > 8'd8)
-                  ? 1'b0
-                  //default
-                  : >>1$forward;
-         $state[1:0] = >>1$reset || $win != 2'b0 ? 2'b01 
-                 : (>>1$led_output == 8'b0 && >>1$state == 2'b01 ) ? //Score display
-                       2'b10
-                 : (>>1$state == 2'b10 && >>1$wait_counter == 25'd30000000)  ? // Normal gameplay
-                       2'b01
-                       
-                       : >>1$state[1:0] ;
-         $wait_counter[24:0] = >>1$reset || >>1$state == 2'b01 ? 25'b0 :
-                      (>>1$state == 2'b10 && >>1$wait_counter < 25'd30000000) ? >>1$wait_counter + 1 :
-                      25'd0;
-                       
-         $score[7:0] = >>1$reset ? 8'd0 : 
-             (>>2$led_output == 8'h80  && >>1$led_output == 8'b0) 
-                ? >>1$score == 0 
-                   ? 8'b00010000 // Start score setting
-                   : >>1$score << 1 // Increase score
-             : (>>2$led_output == 8'h01  && >>1$led_output == 8'b0)
-                ? >>1$score == 0 
-                   ? 8'b00001000 // Start score setting
-                   : >>1$score >> 1 // Increase score
-                   
-                   : >>1$score ;
+      ?$game_select
+         @0   
+            $reset = *ui_in[0] ;
+            $count_speed4[18:0] = (>>1$reset || >>1$count_speed4 == 19'd500000 ) ? 19'b0 : >>1$count_speed4 +1 ;
+            $clk_pulse4 = >>1$reset ? 1'b0: $count_speed4 == 19'd500000 ? ~>>1$clk_pulse4 : >>1$clk_pulse4 ;
+            $count_speed3[19:0] = (>>1$reset || >>1$count_speed3 == 20'd900000 ) ? 20'b0 : >>1$count_speed3 +1 ;
+            $clk_pulse3 = >>1$reset ? 1'b0: $count_speed3 == 20'd900000 ? ~>>1$clk_pulse3 : >>1$clk_pulse3 ;
+            $count_speed2[20:0] = (>>1$reset || >>1$count_speed2 == 21'd1700000 ) ? 21'b0 : >>1$count_speed2 +1 ;
+            $clk_pulse2 = >>1$reset ? 1'b0: $count_speed2 == 21'd1700000 ? ~>>1$clk_pulse2 : >>1$clk_pulse2 ;
+            $count_speed1[23:0] = (>>1$reset || >>1$count_speed1 == 24'd2000000 ) ? 24'b0 : >>1$count_speed1 +1 ;
+            $clk_pulse1 = >>1$reset ? 1'b0: $count_speed1 == 24'd2000000 ? ~>>1$clk_pulse1 : >>1$clk_pulse1 ;
+
+            $speed_level[1:0] = >>1$reset || (>>2$state == 2'b01 && >>3$state == 2'b10) ? 2'b0 :  
+                  ($right_edge && $led_output == 8'h01) || ($left_edge  && $led_output == 8'h80)
+                     ? 2'd3
+                  :  ($right_edge && $led_output == 8'h02) || ($left_edge  && $led_output == 8'h40)
+                     ? 2'd2
+                  :  ($right_edge && $led_output == 8'h04) || ($left_edge  && $led_output == 8'h20)
+                     ? 2'd1
+                  :  ($right_edge && $led_output == 8'h08) || ($left_edge  && $led_output == 8'h10)
+                     ? 2'd0
+                     //default
+                     : >>1$speed_level;
+            $clk_pulse = ($speed_level == 2'b11) ? $clk_pulse4 :
+                   ($speed_level == 2'b10) ? $clk_pulse3 :
+                   ($speed_level == 2'b01) ? $clk_pulse2 :
+                   $clk_pulse1; // Default to slowest speed
+            $led_output[7:0] = (>>1$win == 2'b01 )
+                           ? (>>1$clk_pulse1) 
+                              ?8'b00001111
+                              :8'b0
+                         :>>1$win == 2'b10
+                           ? (>>1$clk_pulse1) 
+                              ?8'b11110000
+                              : 8'b0
+                        :(>>1$reset || (>>2$state == 2'b01 && >>3$state == 2'b10)  )
+                               ? 8'b00001000 :
+
+                         >>2$state == 2'b10 ? 
+                               >>3$score[7:0]
+                         :(!>>2$clk_pulse && >>1$clk_pulse) ?
+                             >>1$forward ? >>1$led_output[7:0] << 1 : >>1$led_output[7:0] >> 1 :
+                             >>1$led_output ;
+            $forward = >>1$reset || (>>2$state == 2'b01 && >>3$state == 2'b10) ? 1'b1 :  // forward is right to left when == 1'b1
+                  ($right_edge  && $led_output <= 8'd8)
+                     ? 1'b1
+                  :  ($left_edge  && $led_output > 8'd8)
+                     ? 1'b0
+                     //default
+                     : >>1$forward;
+            $state[1:0] = >>1$reset || $win != 2'b0 ? 2'b01 
+                    : (>>1$led_output == 8'b0 && >>1$state == 2'b01 ) ? //Score display
+                          2'b10
+                    : (>>1$state == 2'b10 && >>1$wait_counter == 25'd30000000)  ? // Normal gameplay
+                          2'b01
+
+                          : >>1$state[1:0] ;
+            $wait_counter[24:0] = >>1$reset || >>1$state == 2'b01 ? 25'b0 :
+                         (>>1$state == 2'b10 && >>1$wait_counter < 25'd30000000) ? >>1$wait_counter + 1 :
+                         25'd0;
+
+            $score[7:0] = >>1$reset ? 8'd0 : 
+                (>>2$led_output == 8'h80  && >>1$led_output == 8'b0) 
+                   ? >>1$score == 0 
+                      ? 8'b00010000 // Start score setting
+                      : >>1$score << 1 // Increase score
+                : (>>2$led_output == 8'h01  && >>1$led_output == 8'b0)
+                   ? >>1$score == 0 
+                      ? 8'b00001000 // Start score setting
+                      : >>1$score >> 1 // Increase score
+
+                      : >>1$score ;
+
+            $win[1:0] = >>1$reset ? 2'd0 : 
+                  (>>2$led_output == 8'h80  && >>1$led_output == 8'b0 && >>1$score == 8'h80)
+                     ? 2'b01
+                  : (>>2$led_output == 8'h01  && >>1$led_output == 8'b0 && >>1$score == 8'h01)
+                     ? 2'b10
+                     : >>1$win ;
+
+            $left_btn = *ui_in[3];
+            $left_edge = (!>>1$left_btn && $left_btn) ;
+            $right_btn = *ui_in[1];
+            $right_edge = (!>>1$right_btn && $right_btn) ;
+            $out = $led_output ; 
    
-         $win[1:0] = >>1$reset ? 2'd0 : 
-               (>>2$led_output == 8'h80  && >>1$led_output == 8'b0 && >>1$score == 8'h80)
-                  ? 2'b01
-               : (>>2$led_output == 8'h01  && >>1$led_output == 8'b0 && >>1$score == 8'h01)
-                  ? 2'b10
-                  : >>1$win ;
-                  
-         $left_btn = *ui_in[3];
-         $left_edge = (!>>1$left_btn && $left_btn) ;
-         $right_btn = *ui_in[1];
-         $right_edge = (!>>1$right_btn && $right_btn) ;
-         $out = $led_output ; 
    
    
    
    
-   |uart
-      @1
-         
-         $pc[3:0] = $reset
-                     ? 4'b0:
-                  $instr_wr_en
-                     ?>>1$pc+1:
-                     >>1$pc;
-         
-         $dptr[3:0] = $reset
-                     ? 4'b0:
-                  $wr_en
-                     ?>>1$dptr+1:
-                     >>1$dptr;
-         
-         $reset = !/top/fpga_pins/fpga|fsm>>0$prog_select || *reset ;
-         
-         $is_hash = $rx_byte == 8'h23 && $rx_done;
-         $is_enter = $rx_byte == 8'h20 && $rx_done;
-         $comment = $reset || >>1$is_enter
-                     ? 1'b0:
-                  $is_hash || $is_enter
-                     ? 1'b1:
-                     >>1$comment;
-         $valid_rx_done = $rx_done && !$comment;
-         
-         $rx_serial = *ui_in[6];   // pmod connector's TxD port
-         
-         $prog_mem = *ui_in[5];//0 means data 1 means instruction
-         
-         \SV_plus
-            uart_rx #(20000000,115200) uart_rx_1(.clk(*clk),
-                                            .reset($reset),
-                                            .rx_serial($rx_serial),
-                                            .rx_done($$rx_done),
-                                            .rx_byte($$rx_byte[7:0])
-                                            );
-         $first_byte = $reset ? 1'b1 : >>1$first_byte + $valid_rx_done;
-         $data[7:0] = (($rx_byte >= 8'h41 && $rx_byte <= 8'h46) || ($rx_byte >= 8'h61 && $rx_byte <= 8'h66))&& $valid_rx_done && >>1$first_byte
-                        ? {($rx_byte[3:0] - 4'h7) , 4'b0}:
-                     $valid_rx_done && >>1$first_byte
-                        ?{$rx_byte[3:0],4'b0}:
-                     (($rx_byte >= 8'h41 && $rx_byte <= 8'h46) || ($rx_byte >= 8'h61 && $rx_byte <= 8'h66)) && $valid_rx_done
-                        ? {>>1$data[7:4],($rx_byte[3:0] - 4'h7)}:
-                     $valid_rx_done
-                        ?{>>1$data[7:4],$rx_byte[3:0]}:
-                        >>1$data[7:0];
-         
-         $imem_wr_addr[3:0] = >>1$pc[3:0];
-         $instr_wr_en = $valid_rx_done && !>>1$first_byte && !$reset && $prog_mem;
-         $instr_wr[7:0] = $data;
-         $wr_en = $valid_rx_done && !>>1$first_byte && !$reset && !$prog_mem;
-         $idata_wr_addr[3:0] = >>1$dptr[3:0];
-         $data_wr[7:0] = $data;
-         $digit[3:0] = *ui_in[1] ? $data[7:4]:$data[3:0];
-  
-   |lipsi
-      @1
-         
-         $reset = *reset || !/top/fpga_pins/fpga|fsm>>0$lipsi_select;
-         //---------------------MEMORY - INITIALIZATION---------------
-         
-         $instr[7:0] = /top/fpga_pins/fpga|fsm>>0$instr;
-         $data[7:0] = /top/fpga_pins/fpga|fsm>>0$data;
-         
-         //-----------------------PC - LOGIC -------------------------
-         $pc[7:0] = $reset || >>1$reset
-                       ? 8'b0:
-                    >>1$exit || >>1$is_ld_ind || >>1$is_st_ind 
-                       ? >>1$pc:
-                    >>2$is_br || (>>2$is_brz && >>1$z) || (>>2$is_brnz && !>>1$z)
-                       ? >>1$instr:
-                    >>1$is_brl
-                       ? >>1$acc:
-                    >>1$is_ret
-                       ? >>1$data+1'b1:
-                     >>1$pc + 8'b1;
-         //---------------------DECODE - LOGIC -----------------------
-         $valid = (1'b1^>>1$is_2cyc) && !$reset;
-         
-         $is_ALU_reg = $instr[7] == 0 && $valid;
-         $is_st = $instr[7:4] == 4'b1000 && $valid ;
-         $is_brl = $instr[7:4] == 4'b1001 && $valid ;
-         $is_ret = {$instr[7:4], $instr[1:0]} == 6'b1101_01 && $valid;
-         $is_ld_ind = $instr[7:4] == 4'b1010 && $valid;
-         $is_st_ind = $instr[7:4] == 4'b1011 && $valid;
-         $is_sh = $instr[7:4] == 4'b1110 && $valid;
-         //$is_io = $instr[7:4] == 4'b1111 && $instr[7:0]!=8'b1111_1111 && $valid;
-         $exit = $instr[7:0] == 8'b1111_1111 && $valid;
-         $is_ALU_imm = $instr[7:4] == 4'b1100 && $valid;
-         $is_br = {$instr[7:4], $instr[1:0]} == 6'b1101_00 && $valid;
-         $is_brz = {$instr[7:4], $instr[1:0]} == 6'b1101_10 && $valid;
-         $is_brnz = {$instr[7:4], $instr[1:0]} == 6'b1101_11 && $valid;
-         $is_2cyc = ($is_ALU_imm || $is_br || $is_ld_ind || $is_st_ind || $is_brz || $is_brnz);
-         //---------------------ALU - OPERATIONS---------------------
-         $func[2:0] = $is_ALU_reg
-                         ? $instr[6:4] :
-                      >>1$is_ALU_imm
-                         ? >>1$instr[2:0] :
-                      3'bxxx;
-         
-         $dptr[7:0] = $reset
-                    ? 8'b0:
-                 $is_ALU_reg || $is_ld_ind || $is_st || $is_st_ind || $is_brl
-                    ? {4'b0,$instr[3:0]}:
-                 $is_brl
-                    ?{6'b1111_11 ,$instr[1:0]}:
-                 $is_ret
-                    ?{6'b1111_11 ,$instr[3:2]}:
-                 >>1$is_ld_ind  || >>1$is_st_ind 
-                    ? >>1$data:
-                    >>1$dptr;
-         
-         $rd_en = $is_ALU_reg || $is_ld_ind || >>1$is_ld_ind || $is_st_ind || $is_ret;
-         $wr_en = $is_st || >>1$is_st_ind || $is_brl;
-         $op[7:0] = >>1$is_ALU_imm
-                       ? $instr :
-                    $is_ALU_reg
-                       ? $data:
-                    8'bxx;
-         $is_ALU = >>1$is_ALU_imm || $is_ALU_reg;
-         
-         /* verilator lint_off WIDTHEXPAND */
-         {$c,$acc[7:0]} = $reset
-                           ? 9'b0:
-                        $is_ALU && $func == 3'b000
-                           ? >>1$acc + $op[7:0] :
-                        $is_ALU && $func == 3'b000
-                           ? >>1$acc + $op[7:0] :
-                        $is_ALU && $func == 3'b001
-                           ? >>1$acc - $op[7:0] :
-                        $is_ALU && $func == 3'b010
-                           ? >>1$acc + $op[7:0] + >>1$c :
-                        $is_ALU && $func == 3'b011
-                           ? >>1$acc - $op[7:0] - >>1$c :
-                        $is_ALU && $func == 3'b100
-                           ? {>>1$c, >>1$acc & $op[7:0]} :
-                        $is_ALU && $func == 3'b101
-                           ? {>>1$c, >>1$acc | $op[7:0]}:
-                        $is_ALU && $func == 3'b110
-                           ? {>>1$c, >>1$acc ^ $op[7:0]} :
-                        $is_ALU && $func == 3'b111
-                           ? {>>1$c, $op[7:0]}:
-                        $is_sh && $instr[1:0] == 2'b00
-                           ? {>>1$acc[7:0],>>1$c}:
-                        $is_sh && $instr[1:0] == 2'b01
-                           ? {>>1$acc[0],>>1$c,>>1$acc[7:1]}:
-                        $is_sh && $instr[1:0] == 2'b10
-                           ? {>>1$c,>>1$acc[6:0],>>1$acc[7]}:
-                        $is_sh && $instr[1:0] == 2'b11
-                           ? {>>1$c,>>1$acc[0],>>1$acc[7:1]}:
-                        >>1$is_ld_ind
-                           ? {>>1$c,$data}:
-                         {>>1$c,>>1$acc[7:0]};
-         
-         /* verilator lint_on WIDTHEXPAND */
-         $z = $acc == 8'b0;
-         //$data_wr[7:0] = $wr_en? $acc : >>1$data_wr;
-         $data_wr[7:0] = !$wr_en ? >>1$data_wr:
-                         !$is_brl ? $acc:
-                         $pc;
-         $digit[3:0] = *ui_in[1]? $acc[7:4] : $acc[3:0];
          
          
          
