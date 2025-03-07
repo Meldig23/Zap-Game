@@ -959,7 +959,7 @@ endmodule
    
    |game
       @1
-         $reset = !/top/fpga_pins/fpga|fsm>>0$game_select ;
+         $reset = *ui_in[0] ;
          $count_speed4[18:0] = (>>1$reset || >>1$count_speed4 == 19'd500000 ) ? 19'b0 : >>1$count_speed4 +1 ;
          $clk_pulse4 = >>1$reset ? 1'b0: $count_speed4 == 19'd500000 ? ~>>1$clk_pulse4 : >>1$clk_pulse4 ;
          $count_speed3[19:0] = (>>1$reset || >>1$count_speed3 == 20'd900000 ) ? 20'b0 : >>1$count_speed3 +1 ;
